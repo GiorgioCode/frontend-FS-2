@@ -3,7 +3,7 @@ tareas pendientes
 -   [x] Store de autenticacion
 -   [ ] Store de Carrito
 -   [ ] Componente de Ruta Protegida
--   [ ] Servicio para conexion de la API
+-   [x] Servicio para conexion de la API
 -   [ ] Componente Login
 -   [ ] Componente Register
 -   [ ] Modificar Header
