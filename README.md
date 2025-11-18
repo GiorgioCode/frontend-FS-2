@@ -1,6 +1,6 @@
 tareas pendientes
 
--   [ ] Store de autenticacion
+-   [x] Store de autenticacion
 -   [ ] Store de Carrito
 -   [ ] Componente de Ruta Protegida
 -   [ ] Servicio para conexion de la API
