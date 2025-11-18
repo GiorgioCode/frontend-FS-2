@@ -1,3 +1,5 @@
+// PENDIENTE MODIFICACION
+
 // Componente Cart - Carrito lateral (drawer) con funcionalidad completa de e-commerce
 // Responsabilidades: mostrar productos, modificar cantidades, calcular totales y procesar checkout
 // Se renderiza como overlay cuando el estado isOpen del store es true

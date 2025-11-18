@@ -1,3 +1,5 @@
+// PENDIENTE MODIFICACION
+
 // Componente Header - Navegación principal y acceso al carrito
 // Incluye el logo, navegación y botón del carrito con contador
 // Este componente se renderiza en todas las páginas como header fijo
