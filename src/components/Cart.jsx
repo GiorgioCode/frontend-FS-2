@@ -1,5 +1,3 @@
-// PENDIENTE MODIFICACION
-
 // Componente Cart - Carrito lateral (drawer) con funcionalidad completa de e-commerce
 // Responsabilidades: mostrar productos, modificar cantidades, calcular totales y procesar checkout
 // Se renderiza como overlay cuando el estado isOpen del store es true
@@ -8,24 +6,44 @@
 import React, { useState } from "react";
 // Importación del store de Zustand que contiene toda la lógica del carrito
 import { useCartStore } from "../store/useCartStore";
+// Importación del store de autenticación
+import { useAuthStore } from "../store/useAuthStore";
 // Importación del servicio API para comunicarse con el backend y enviar órdenes
 import { ordersAPI } from "../services/api";
+// Importación de useNavigate para redirección
+import { useNavigate } from "react-router-dom";
 
 // Definición del componente funcional Cart
 const Cart = () => {
-    // Extracción de estados y funciones del store global de Zustand mediante destructuring
-    const {
-        items, // Array de productos en el carrito con formato {producto, cantidad}
-        isOpen, // Boolean que determina si el carrito está visible
-        addItem, // Función para agregar un producto al carrito
-        removeItem, // Función para decrementar cantidad o eliminar producto
-        deleteItem, // Función para eliminar completamente un producto
-        clearCart, // Función para vaciar todo el carrito
-        getTotal, // Función que calcula el precio total del carrito
-        getTotalItems, // Función que cuenta el total de productos
-        closeCart, // Función para cerrar el drawer del carrito
-        getOrderData, // Función que formatea los datos para enviar al backend
-    } = useCartStore();
+    const navigate = useNavigate();
+
+    // Extracción de estados y funciones del store global de Zustand usando selectores
+    const items = useCartStore((state) => state.items || []);
+    const isOpen = useCartStore((state) => state.isOpen || false);
+    const addItem = useCartStore((state) => state.addItem);
+    const removeItem = useCartStore((state) => state.removeItem);
+    const deleteItem = useCartStore((state) => state.deleteItem);
+    const clearCart = useCartStore((state) => state.clearCart);
+    const closeCart = useCartStore((state) => state.closeCart);
+
+    // Calcular totales de forma reactiva con protección
+    const totalItems = Array.isArray(items)
+        ? items.reduce((total, item) => {
+              return total + (item?.cantidad || 0);
+          }, 0)
+        : 0;
+
+    const total = Array.isArray(items)
+        ? items.reduce((total, item) => {
+              if (item?.producto?.precio && item?.cantidad) {
+                  return total + item.producto.precio * item.cantidad;
+              }
+              return total;
+          }, 0)
+        : 0;
+
+    // Verificar autenticación
+    const { isAuthenticated } = useAuthStore();
 
     // Estados locales del componente para manejar el proceso de checkout
     // Estos estados no se comparten globalmente, solo son necesarios en este componente
@@ -46,6 +64,13 @@ const Cart = () => {
     // Función asíncrona para manejar el proceso completo de checkout
     // Se ejecuta cuando el usuario hace click en "Finalizar Compra"
     const handleCheckout = async () => {
+        // Validación: verificar autenticación
+        if (!isAuthenticated) {
+            closeCart();
+            navigate("/login");
+            return;
+        }
+
         // Validación: verificar que el carrito no esté vacío
         if (items.length === 0) {
             alert("Tu carrito está vacío"); // Alert básico (se podría mejorar con toast)
@@ -59,12 +84,36 @@ const Cart = () => {
 
         try {
             // Bloque try-catch para manejo de errores asíncronos
-            // Obtener los datos formateados de la orden desde el store
-            const orderData = getOrderData();
+            // Obtener los datos formateados de la orden
+            const productos = validItems.map((item) => ({
+                id: item.producto.id,
+                nombre: item.producto.nombre || "Producto sin nombre",
+                precio: Number(item.producto.precio) || 0,
+                cantidad: Number(item.cantidad) || 1,
+            }));
+
+            if (productos.length === 0) {
+                setCheckoutError("No hay productos válidos en el carrito");
+                setIsCheckingOut(false);
+                return;
+            }
+
+            const orderData = {
+                productos: productos,
+                total: Number(total) || 0,
+            };
+
+            console.log("Enviando orden:", orderData);
+            console.log(
+                "Token disponible:",
+                !!sessionStorage.getItem("authToken")
+            );
 
             // Realizar petición HTTP POST al backend para crear la orden
             // Utiliza el servicio API que encapsula fetch
             const response = await ordersAPI.create(orderData);
+
+            console.log("Respuesta del servidor:", response);
 
             // Si la petición es exitosa, procesar la respuesta
             console.log("Orden creada exitosamente:", response);
@@ -81,9 +130,10 @@ const Cart = () => {
             }, 3000); // 3000ms = 3 segundos
         } catch (error) {
             console.error("Error en el checkout:", error);
-            setCheckoutError(
-                "Error al procesar la compra. Inténtalo nuevamente."
-            );
+            const errorMessage =
+                error.message ||
+                "Error al procesar la compra. Inténtalo nuevamente.";
+            setCheckoutError(errorMessage);
         } finally {
             setIsCheckingOut(false);
         }
@@ -101,6 +151,11 @@ const Cart = () => {
         return null;
     }
 
+    // Asegurar que items sea un array válido
+    const validItems = Array.isArray(items)
+        ? items.filter((item) => item && item.producto)
+        : [];
+
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-end">
             <div className="bg-white w-full max-w-md h-full overflow-y-auto flex flex-col">
@@ -108,9 +163,9 @@ const Cart = () => {
                 <div className="flex justify-between items-center p-4 border-b border-gray-200">
                     <h2 className="text-lg font-semibold">
                         Carrito
-                        {getTotalItems() > 0 && (
+                        {totalItems > 0 && (
                             <span className="text-sm text-gray-500">
-                                ({getTotalItems()})
+                                ({totalItems})
                             </span>
                         )}
                     </h2>
@@ -125,7 +180,7 @@ const Cart = () => {
 
                 {/* Contenido del carrito */}
                 <div className="flex-1 p-4">
-                    {items.length === 0 ? (
+                    {validItems.length === 0 ? (
                         // Carrito vacío
                         <div className="text-center py-8">
                             <p className="text-gray-500 mb-4">
@@ -142,15 +197,18 @@ const Cart = () => {
                         // Carrito con productos
                         <>
                             <div className="space-y-3 mb-4">
-                                {items.map((item) => (
+                                {validItems.map((item) => (
                                     <div
                                         key={item.producto.id}
                                         className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg"
                                     >
                                         {/* Imagen del producto */}
                                         <img
-                                            src={item.producto.imagen}
-                                            alt={item.producto.nombre}
+                                            src={item.producto.imagen || ""}
+                                            alt={
+                                                item.producto.nombre ||
+                                                "Producto"
+                                            }
                                             className="w-12 h-12 object-cover rounded"
                                             onError={(e) => {
                                                 e.target.src =
@@ -161,11 +219,12 @@ const Cart = () => {
                                         {/* Información del producto */}
                                         <div className="flex-1">
                                             <h4 className="text-sm font-medium text-gray-900">
-                                                {item.producto.nombre}
+                                                {item.producto.nombre ||
+                                                    "Producto sin nombre"}
                                             </h4>
                                             <p className="text-xs text-gray-500">
                                                 {formatPrice(
-                                                    item.producto.precio
+                                                    item.producto.precio || 0
                                                 )}
                                             </p>
                                         </div>
@@ -182,7 +241,7 @@ const Cart = () => {
                                                 -
                                             </button>
                                             <span className="text-sm font-medium w-6 text-center">
-                                                {item.cantidad}
+                                                {item.cantidad || 0}
                                             </span>
                                             <button
                                                 onClick={() =>
@@ -207,8 +266,8 @@ const Cart = () => {
                                         {/* Subtotal del item */}
                                         <div className="text-sm font-medium text-blue-600">
                                             {formatPrice(
-                                                item.producto.precio *
-                                                    item.cantidad
+                                                (item.producto.precio || 0) *
+                                                    (item.cantidad || 0)
                                             )}
                                         </div>
                                     </div>
@@ -222,21 +281,31 @@ const Cart = () => {
                                         Total:
                                     </span>
                                     <span className="text-lg font-bold text-blue-600">
-                                        {formatPrice(getTotal())}
+                                        {formatPrice(total)}
                                     </span>
                                 </div>
                             </div>
 
                             {/* Botones de acción */}
                             <div className="space-y-2">
+                                {!isAuthenticated && (
+                                    <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded text-sm mb-2">
+                                        <p className="font-medium">
+                                            ⚠️ Debes iniciar sesión para
+                                            finalizar tu compra
+                                        </p>
+                                    </div>
+                                )}
                                 <button
                                     onClick={handleCheckout}
-                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded transition-colors"
-                                    disabled={isCheckingOut}
+                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    disabled={isCheckingOut || !isAuthenticated}
                                 >
                                     {isCheckingOut
                                         ? "Procesando..."
-                                        : "Finalizar Compra"}
+                                        : isAuthenticated
+                                        ? "Finalizar Compra"
+                                        : "Iniciar Sesión para Comprar"}
                                 </button>
                                 <button
                                     onClick={clearCart}

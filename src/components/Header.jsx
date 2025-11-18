@@ -1,5 +1,3 @@
-// PENDIENTE MODIFICACION
-
 // Componente Header - Navegación principal y acceso al carrito
 // Incluye el logo, navegación y botón del carrito con contador
 // Este componente se renderiza en todas las páginas como header fijo
@@ -7,23 +5,36 @@
 // Importación de React (biblioteca principal)
 import React from "react";
 // Importación de Link para navegación SPA y useLocation para detectar ruta activa
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 // Importación del store de Zustand para acceder al estado del carrito
 import { useCartStore } from "../store/useCartStore";
+// Importación del store de autenticación
+import { useAuthStore } from "../store/useAuthStore";
 
 // Definición del componente funcional Header
 const Header = () => {
     // Hook de React Router para obtener la ruta actual y marcar enlaces activos
     const location = useLocation();
 
-    // Extracción de funciones del store de Zustand usando destructuring
-    // getTotalItems: función para calcular total de productos en carrito
-    // toggleCart: función para abrir/cerrar el drawer del carrito
-    const { getTotalItems, toggleCart } = useCartStore();
+    const navigate = useNavigate();
 
-    // Ejecutar la función getTotalItems para obtener el contador actual
-    // Se re-ejecuta automáticamente cuando cambia el estado del carrito
-    const totalItems = getTotalItems();
+    // Extracción del store de carrito usando selectores individuales
+    const toggleCart = useCartStore((state) => state.toggleCart);
+    const items = useCartStore((state) => state.items || []);
+
+    // Calcular totalItems de forma segura
+    const totalItems = items.reduce((total, item) => {
+        return total + (item?.cantidad || 0);
+    }, 0);
+
+    // Extracción del store de autenticación
+    const { user, isAuthenticated, logout } = useAuthStore();
+
+    // Función para manejar el logout
+    const handleLogout = () => {
+        logout();
+        navigate("/login");
+    };
 
     // Renderizado del componente - JSX que define la estructura del header
     return (
@@ -83,8 +94,41 @@ const Header = () => {
                     </ul>
                 </nav>
 
-                {/* Sección del botón del carrito de compras */}
-                <div className="flex items-center">
+                {/* Sección de usuario y carrito */}
+                <div className="flex items-center gap-3">
+                    {/* Información del usuario si está autenticado */}
+                    {isAuthenticated && user ? (
+                        <div className="hidden sm:flex items-center gap-2 text-sm text-gray-700">
+                            <span className="text-gray-600">
+                                {user.nombre} {user.apellido}
+                            </span>
+                            <span className="text-gray-400">|</span>
+                            <button
+                                onClick={handleLogout}
+                                className="text-gray-600 hover:text-red-600 transition-colors"
+                            >
+                                Cerrar Sesión
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="hidden sm:flex items-center gap-2">
+                            <Link
+                                to="/login"
+                                className="text-gray-600 hover:text-blue-600 text-sm font-medium transition-colors"
+                            >
+                                Iniciar Sesión
+                            </Link>
+                            <span className="text-gray-400">|</span>
+                            <Link
+                                to="/register"
+                                className="text-blue-600 hover:text-blue-700 text-sm font-medium transition-colors"
+                            >
+                                Registrarse
+                            </Link>
+                        </div>
+                    )}
+
+                    {/* Botón del carrito de compras */}
                     <button
                         className="relative flex items-center space-x-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md text-sm font-medium transition-colors"
                         onClick={toggleCart} // Event handler que ejecuta la función toggleCart al hacer click
