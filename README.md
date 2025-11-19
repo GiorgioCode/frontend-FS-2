@@ -25,3 +25,7 @@ OBSERVACIONES ENCONTRADAS
 -   Faltan filtros de productos
 -   Falta agregar posibilidad de tener usuario administrador y gestionar productos desde el frontend (CRUD PRODUCTOS)
 -   Los cards de los productos, no tienen un vista de detalle.
+-   falta gestion de olvido de contraseña
+-   falta feedback mediante email de registro
+-   falta verificacion de email de usuario
+-   falta capacidad de enviar mails
