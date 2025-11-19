@@ -1,4 +1,3 @@
-//PENDIENTE MODIFICACION
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
@@ -8,27 +7,37 @@ export const useCartStore = create(
             items: [],
             isOpen: false,
             addItem: (product) => {
-                const currentItems = get().items;
-                const existingItemIndex = currentItems.findIndex(
-                    (item) => item.product.id === product.id
-                );
-                if (existingItemIndex >= 0) {
-                    const updatedItems = [...currentItems];
-                    updatedItems[existingItemIndex].cantidad += 1;
-                    set({ items: updatedItems });
-                } else {
-                    set({
-                        items: [
+                try {
+                    if (!product || !product.id) {
+                        console.error("Invalid product:", product);
+                        return;
+                    }
+                    const currentItems = get().items || [];
+                    const existingItemIndex = currentItems.findIndex(
+                        (item) =>
+                            item.producto && item.producto.id === product.id
+                    );
+                    let newItems;
+                    if (existingItemIndex >= 0) {
+                        const updatedItems = [...currentItems];
+                        updatedItems[existingItemIndex].cantidad += 1;
+                        newItems = updatedItems;
+                    } else {
+                        newItems = [
                             ...currentItems,
                             { producto: product, cantidad: 1 },
-                        ],
-                    });
+                        ];
+                    }
+                    // Actualizar items y abrir el carrito automáticamente
+                    set({ items: newItems, isOpen: true });
+                } catch (error) {
+                    console.error("Error in addItem:", error);
                 }
             },
             removeItem: (productId) => {
-                const currentItems = get().items;
+                const currentItems = get().items || [];
                 const existingItemIndex = currentItems.findIndex(
-                    (item) => item.product.id === productId
+                    (item) => item.producto && item.producto.id === productId
                 );
                 if (existingItemIndex >= 0) {
                     const updatedItems = [...currentItems];
@@ -41,9 +50,11 @@ export const useCartStore = create(
                 }
             },
             deleteItem: (productId) => {
+                const currentItems = get().items || [];
                 set({
-                    items: get().items.filter(
-                        (item) => item.producto.id !== productId
+                    items: currentItems.filter(
+                        (item) =>
+                            item.producto && item.producto.id !== productId
                     ),
                 });
             },
@@ -51,31 +62,43 @@ export const useCartStore = create(
                 set({ items: [] });
             },
             getTotal: () => {
-                return get().items.reduce((total, item) => {
-                    return total + item.producto.precio * item.cantidad;
+                const items = get().items || [];
+                return items.reduce((total, item) => {
+                    if (
+                        item.producto &&
+                        item.producto.precio &&
+                        item.cantidad
+                    ) {
+                        return total + item.producto.precio * item.cantidad;
+                    }
+                    return total;
                 }, 0);
             },
             getTotalItems: () => {
-                return get().items.reduce(
-                    (total, item) => total + item.cantidad,
+                const items = get().items || [];
+                return items.reduce(
+                    (total, item) => total + (item.cantidad || 0),
                     0
                 );
             },
             openCart: () => set({ isOpen: true }),
             closeCart: () => set({ isOpen: false }),
             toggleCart: () => {
-                set((state) => ({ isOpen: !state.isOpen }));
+                const currentState = get();
+                set({ isOpen: !currentState.isOpen });
             },
             getOrderData: () => {
-                const items = get().items;
+                const items = get().items || [];
                 const total = get().getTotal();
                 return {
-                    productos: items.map((item) => ({
-                        id: item.producto.id,
-                        nombre: item.producto.nombre,
-                        precio: item.producto.precio,
-                        cantidad: item.cantidad,
-                    })),
+                    productos: items
+                        .filter((item) => item.producto)
+                        .map((item) => ({
+                            id: item.producto.id,
+                            nombre: item.producto.nombre,
+                            precio: item.producto.precio,
+                            cantidad: item.cantidad,
+                        })),
                     total: total,
                     fecha: new Date().toISOString(), //Timestamp ISO8601
                 };
@@ -83,7 +106,15 @@ export const useCartStore = create(
         }),
         {
             name: "cart-storage",
-            patialize: (state) => ({ items: state.items }),
+            partialize: (state) => ({ items: state.items || [] }),
+            // Asegurar que los datos cargados sean válidos
+            merge: (persistedState, currentState) => {
+                const items = persistedState?.items;
+                return {
+                    ...currentState,
+                    items: Array.isArray(items) ? items : [],
+                };
+            },
         }
     )
 );
